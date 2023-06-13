@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const dns = require('dns');
 const app = express();
 
 // Basic Configuration
@@ -23,22 +24,32 @@ app.get('/api/hello', function(req, res) {
 });
 
 // API endpoint for URL shortening
-app.post('/api/shorturl', function(req, res) {
+app.post('/api/shorturl', (req, res) => {
   const longUrl = req.body.url;
   const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
   if (!urlRegex.test(longUrl)) {
     res.status(400).json({error: 'invalid url'});
     return;
   }
-  const shortUrl = Object.keys(urlDatabase).length + 1;
-  urlDatabase[shortUrl] = longUrl;
 
-  res.json(
-    {
-      original_url: longUrl, 
-      short_url: shortUrl
+  // Validate the URL using dns.lookup()
+  const hostname = new URL(longUrl).hostname;
+  dns.lookup(hostname, (err) => {
+    if(err) {
+      res.status(400).json({error: 'invalid url'});
+      return;
     }
-  );
+
+    const shortUrl = Object.keys(urlDatabase).length + 1;
+    urlDatabase[shortUrl] = longUrl;
+
+    res.json(
+      {
+        original_url: longUrl, 
+        short_url: shortUrl
+      }
+    );
+  });
 });
 
 // Redirect to the original URL
