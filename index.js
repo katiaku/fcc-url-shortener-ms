@@ -3,14 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const dns = require('dns');
 const app = express();
-
-// Basic Configuration
+const urlDatabase = {};
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
-const urlDatabase = {};
+app.use(express.urlencoded({ extended: true }));
 
 app.use('/public', express.static(`${process.cwd()}/public`));
 
@@ -25,24 +23,27 @@ app.get('/api/hello', function(req, res) {
 
 // API endpoint for URL shortening
 app.post('/api/shorturl', (req, res) => {
+  console.log(req.body);
   const longUrl = req.body.url;
-  const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+  const urlRegex = /^https?:\/\/(?:www\.)?[^\s/$.?#]+\.[^\s]*$/i;
   if (!urlRegex.test(longUrl)) {
-    res.status(400).json({error: 'invalid url'});
+    res.setHeader('Content-Type', 'application/json');
+    res.json({error: 'invalid url'});
     return;
   }
 
-  // Validate the URL using dns.lookup()
   const hostname = new URL(longUrl).hostname;
   dns.lookup(hostname, (err) => {
     if(err) {
-      res.status(400).json({error: 'invalid url'});
+      res.setHeader('Content-Type', 'application/json');
+      res.json({error: 'invalid url'});
       return;
     }
 
     const shortUrl = Object.keys(urlDatabase).length + 1;
     urlDatabase[shortUrl] = longUrl;
 
+    res.setHeader('Content-Type', 'application/json');
     res.json(
       {
         original_url: longUrl, 
@@ -57,10 +58,11 @@ app.get('/api/shorturl/:shortUrl', function(req, res) {
   const shortUrl = req.params.shortUrl;
   const longUrl = urlDatabase[shortUrl];
 
-  if (longUrl) {
+  if(longUrl) {
     res.redirect(301, longUrl);
   } else {
-    res.status(404).json({error: 'URL not found'});
+    res.setHeader('Content-Type', 'application/json');
+    res.json({error: 'URL not found'});
   }
 });
 
